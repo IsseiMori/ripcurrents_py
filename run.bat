@@ -1,0 +1,46 @@
+
+rem for %%f in (E:/ripcurrents/Holland/mp4/1215/*.mp4) do (
+rem 	python contours.py --video E:/ripcurrents/Holland/mp4/1215/%%~nxf --out E:\ripcurrents\Holland\results --height 480 --window 1500
+rem 	python contours_unit.py --video E:/ripcurrents/Holland/mp4/1215/%%~nxf --out E:\ripcurrents\Holland\results --height 480 --window 1500
+rem 	python timex.py --video E:/ripcurrents/Holland/mp4/1215/%%~nxf --out E:\ripcurrents\Holland\results --height 480
+rem )
+
+for %%f in (E:/ripcurrents/Holland/mp4/mp4_all/1102/*.mp4) do (
+	python shear.py --video E:/ripcurrents/Holland/mp4/mp4_all/1102/%%~nxf --out E:/ripcurrents/Holland/mp4/results/shear_all/1102/%%~nxf --height 480 --window 10
+)
+
+for %%f in (E:/ripcurrents/Holland/mp4/mp4_all/1205/*.mp4) do (
+	python shear.py --video E:/ripcurrents/Holland/mp4/mp4_all/1205/%%~nxf --out E:/ripcurrents/Holland/mp4/results/shear_all/1205/%%~nxf --height 480 --window 10
+)
+
+for %%f in (E:/ripcurrents/Holland/mp4/mp4_all/0606/*.mp4) do (
+	python shear.py --video E:/ripcurrents/Holland/mp4/mp4_all/0606/%%~nxf --out E:/ripcurrents/Holland/mp4/results/shear_all/0606/%%~nxf --height 480 --window 10
+)
+
+for %%f in (E:/ripcurrents/Holland/mp4/mp4_all/0720/*.mp4) do (
+	python shear.py --video E:/ripcurrents/Holland/mp4/mp4_all/0720/%%~nxf --out E:/ripcurrents/Holland/mp4/results/shear_all/0720/%%~nxf --height 480 --window 10
+)
+
+for %%f in (E:/ripcurrents/Holland/mp4/mp4_all/0904/*.mp4) do (
+	python shear.py --video E:/ripcurrents/Holland/mp4/mp4_all/0904/%%~nxf --out E:/ripcurrents/Holland/mp4/results/shear_all/0904/%%~nxf --height 480 --window 10
+)
+
+for %%f in (E:/ripcurrents/Holland/mp4/mp4_all/0927/*.mp4) do (
+	python shear.py --video E:/ripcurrents/Holland/mp4/mp4_all/0927/%%~nxf --out E:/ripcurrents/Holland/mp4/results/shear_all/0927/%%~nxf --height 480 --window 10
+)
+
+for %%f in (E:/ripcurrents/Holland/mp4/mp4_all/1029/*.mp4) do (
+	python shear.py --video E:/ripcurrents/Holland/mp4/mp4_all/1029/%%~nxf --out E:/ripcurrents/Holland/mp4/results/shear_all/1029/%%~nxf --height 480 --window 10
+)
+
+
+
+rem python shear.py --video E:\ripcurrents\Holland\mp4\selection\0829.mp4 --out E:/ripcurrents/Holland/mp4/shear_threshold/0829 --height 480 --window 1200
+rem python shear.py --video E:\ripcurrents\Holland\mp4\selection\0904.mp4 --out E:/ripcurrents/Holland/mp4/shear_threshold/0904 --height 480 --window 1200
+rem python shear.py --video E:\ripcurrents\Holland\mp4\selection\0917.mp4 --out E:/ripcurrents/Holland/mp4/shear_threshold/0917 --height 480 --window 1200
+rem python shear.py --video E:\ripcurrents\Holland\mp4\selection\0918.mp4 --out E:/ripcurrents/Holland/mp4/shear_threshold/0918 --height 480 --window 1200
+rem ::python shear.py --video E:\ripcurrents\Holland\mp4\selection\0926.mp4 --out E:/ripcurrents/Holland/mp4/shear_threshold/0926 --height 480 --window 1200
+rem python shear.py --video E:\ripcurrents\Holland\mp4\selection\0929.mp4 --out E:/ripcurrents/Holland/mp4/shear_threshold/0929 --height 480 --window 1200
+rem python shear.py --video E:\ripcurrents\Holland\mp4\selection\0917.mp4 --out E:/ripcurrents/Holland/mp4/shear_threshold/0917 --height 480 --window 1200
+rem python shear.py --video E:\ripcurrents\Holland\mp4\selection\1016.mp4 --out E:/ripcurrents/Holland/mp4/shear_threshold/1016 --height 480 --window 1200
+rem ::python shear.py --video E:\ripcurrents\Holland\mp4\selection\1020.mp4 --out E:/ripcurrents/Holland/mp4/shear_threshold/1020 --height 480 --window 1200

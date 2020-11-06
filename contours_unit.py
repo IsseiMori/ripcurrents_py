@@ -186,6 +186,7 @@ def main(video, outpath, height, window_size):
 		end_read_time = time.time()
 		timers["reading"].append(end_read_time - start_read_time)
 
+
 		# start pre-process timer
 		start_pre_time = time.time()
 
@@ -223,6 +224,7 @@ def main(video, outpath, height, window_size):
 
 		
 		cpu_flow = gpu_flow.download()
+		cpu_flow = calc_unit_flow_cpu(cpu_flow)
 
 		# prevent bug on edge
 		cpu_flow = zero_edge_flow(cpu_flow)
@@ -444,22 +446,23 @@ def main(video, outpath, height, window_size):
 		if frame_count == 1500:
 			break
 
+
 		if k == 115:
 			#cv2.imwrite(outpath + "/contours_root.jpg", flow_contours_root)
 			# cv2.imwrite(outpath + "/flow_sub.jpg", cpu_flow_mean_sub_masked_bgr)
-			cv2.imwrite(outpath + "/" + filename + "/flow_average.jpg", cpu_flow_average_bgr)
-			cv2.imwrite(outpath + "/" + filename + "/flow_sub.jpg", cpu_flow_average_sub_bgr)
-			cv2.imwrite(outpath + "/" + filename + "/flow_sub_root_strong.jpg", cpu_flow_average_sub_bgr_strong)
-			cv2.imwrite(outpath + "/" + filename + "/flow_sub_root_mask.jpg", cpu_flow_mean_sub_masked_root_bgr)
-			cv2.imwrite(outpath + "/" + filename + "/contours.jpg", flow_contours)
+			cv2.imwrite(outpath + "/" + filename + "/flow_average_unit.jpg", cpu_flow_average_bgr)
+			cv2.imwrite(outpath + "/" + filename + "/flow_sub_unit.jpg", cpu_flow_average_sub_bgr)
+			cv2.imwrite(outpath + "/" + filename + "/flow_sub_root_strong_unit.jpg", cpu_flow_average_sub_bgr_strong)
+			cv2.imwrite(outpath + "/" + filename + "/flow_sub_root_mask_unit.jpg", cpu_flow_mean_sub_masked_root_bgr)
+			cv2.imwrite(outpath + "/" + filename + "/contours_unit.jpg", flow_contours)
 
 		frame_count += 1
 
-	cv2.imwrite(outpath + "/" + filename + "/flow_average.jpg", cpu_flow_average_bgr)
-	cv2.imwrite(outpath + "/" + filename + "/flow_sub.jpg", cpu_flow_average_sub_bgr)
-	cv2.imwrite(outpath + "/" + filename + "/flow_sub_root_strong.jpg", cpu_flow_average_sub_bgr_strong)
-	cv2.imwrite(outpath + "/" + filename + "/flow_sub_root_mask.jpg", cpu_flow_mean_sub_masked_root_bgr)
-	cv2.imwrite(outpath + "/" + filename + "/contours.jpg", flow_contours)
+	cv2.imwrite(outpath + "/" + filename + "/flow_average_unit.jpg", cpu_flow_average_bgr)
+	cv2.imwrite(outpath + "/" + filename + "/flow_sub_unit.jpg", cpu_flow_average_sub_bgr)
+	cv2.imwrite(outpath + "/" + filename + "/flow_sub_root_strong_unit.jpg", cpu_flow_average_sub_bgr_strong)
+	cv2.imwrite(outpath + "/" + filename + "/flow_sub_root_mask_unit.jpg", cpu_flow_mean_sub_masked_root_bgr)
+	cv2.imwrite(outpath + "/" + filename + "/contours_unit.jpg", flow_contours)
 
 	# release the capture
 	cap.release()
