@@ -1,5 +1,4 @@
 # python contours.py --video beach.mp4 --out . --height 480 --window 900
-# python shear.py --video E:\ripcurrents\Holland\mp4\09042020\HSP20-09-04_15-20-00-58_00085.mp4 --out E:\ripcurrents\Holland\mp4 --height 480 --window 1500
 
 
 # Unresolved Bugs
@@ -12,7 +11,7 @@ import time
 import math
 import matplotlib.pyplot as plt
 from PIL import Image
-import scipy.linalg as la
+import copy
 
 # return degree angle and normalized magnitude
 def calc_angle_from_flow_cpu(cpu_flow):
@@ -83,27 +82,72 @@ def zero_edge_flow(cpu_flow):
 
 	return cpu_flow
 
-def cal_eigval_percentile_threshold(flow_eigvals_, eigval_percentile):
-	flow_eigvals = flow_eigvals_.copy()
-	flow_eigen_percentile_val = np.percentile(flow_eigvals[:,:,0], eigval_percentile)
-	print(flow_eigen_percentile_val)
-	flow_eigvals[:,:,0] = (flow_eigvals[:,:,0] > flow_eigen_percentile_val) * np.ones_like(flow_eigvals[:,:,0], np.float32)
-	flow_eigvecs_angle, flow_eigvecs_magnitude = calc_angle_from_flow_cpu(flow_eigvals)
-	flow_eigvecs_bgr = calc_bgr_from_angle_magnitude(flow_eigvecs_angle, flow_eigvecs_magnitude)
-	flow_eigvecs_bgr = cv2.putText(flow_eigvecs_bgr, str(flow_eigen_percentile_val), (50, 50) , 
-								   cv2.FONT_HERSHEY_SIMPLEX ,  
-			   					   1, (255,255,255), 2, cv2.LINE_AA)
-	return flow_eigvecs_bgr
+line_pos = []
+def draw_lines(event, x, y, flags, param):
+	if event == cv2.EVENT_LBUTTONDOWN:
+		print(x, y)
+		pos = np.array([x, y])
+		line_pos.append(pos)
 
-def cal_eigval_val_threshold(flow_eigvals_, eigval_val):
-	flow_eigvals = flow_eigvals_.copy()
-	flow_eigvals[:,:,0] = (flow_eigvals[:,:,0] > eigval_val) * np.ones_like(flow_eigvals[:,:,0], np.float32)
-	flow_eigvecs_angle, flow_eigvecs_magnitude = calc_angle_from_flow_cpu(flow_eigvals)
-	flow_eigvecs_bgr = calc_bgr_from_angle_magnitude(flow_eigvecs_angle, flow_eigvecs_magnitude)
-	flow_eigvecs_bgr = cv2.putText(flow_eigvecs_bgr, str(eigval_val), (50, 50) , 
-								   cv2.FONT_HERSHEY_SIMPLEX ,  
-			   					   1, (255,255,255), 2, cv2.LINE_AA)
-	return flow_eigvecs_bgr
+class Timeline:
+	def __init__(self, start, end, vnum):
+		self.vertices_origin = []
+		self.vertices = []
+		
+		spacing = (end - start) / (vnum - 1)
+		for i_vertex in range(0, vnum):
+			vertex = start + spacing * i_vertex
+			self.vertices_origin.append(vertex)
+
+	def birth_line(self):
+		new_vertices = copy.deepcopy(self.vertices_origin)
+		self.vertices += new_vertices
+
+	def move_vertices(self, flow, step_size):
+
+		# move each vertex based on the flow
+		for i_vertex in range(len(self.vertices)):
+			x = self.vertices[i_vertex][0]
+			y = self.vertices[i_vertex][1]
+			flow_vec = flow[math.floor(y)][math.floor(x)]
+			x += flow_vec[0] * step_size
+			y += flow_vec[1] * step_size
+			self.vertices[i_vertex][0] = x
+			self.vertices[i_vertex][1] = y
+
+	# draw timelines and return the image
+	def draw_lines(self, img):
+		ret_img = img.copy()
+
+
+		# draw initial line
+		for i_vertex in range(len(self.vertices_origin) - 1):
+			x1 = math.floor(self.vertices_origin[i_vertex][0])
+			y1 = math.floor(self.vertices_origin[i_vertex][1])
+			x2 = math.floor(self.vertices_origin[i_vertex + 1][0])
+			y2 = math.floor(self.vertices_origin[i_vertex + 1][1])
+			ret_img = cv2.circle(ret_img, (x1, y1), 4, (70, 70, 70), -1)
+			ret_img = cv2.line(ret_img, (x1, y1), (x2, y2), (70, 70, 70), 4) 
+			
+			# draw the last point
+			if i_vertex == len(self.vertices_origin) - 1:
+				ret_img = cv2.circle(ret_img, (x2, y2), 4, (70, 70, 70), -1)
+
+
+		# draw moving vertices
+		for i_vertex in range(len(self.vertices) - 1):
+			x1 = math.floor(self.vertices[i_vertex][0])
+			y1 = math.floor(self.vertices[i_vertex][1])
+			x2 = math.floor(self.vertices[i_vertex + 1][0])
+			y2 = math.floor(self.vertices[i_vertex + 1][1])
+			ret_img = cv2.circle(ret_img, (x1, y1), 4, (255, 0, 0), -1)
+			ret_img = cv2.line(ret_img, (x1, y1), (x2, y2), (255, 0, 0), 4) 
+			
+			# draw the last point
+			if i_vertex == len(self.vertices) - 1:
+				ret_img = cv2.circle(ret_img, (x2, y2), 4, (255, 0, 0), -1)
+		
+		return ret_img
 
 def main(video, outpath, height, window_size):
 
@@ -119,8 +163,8 @@ def main(video, outpath, height, window_size):
 	print("reading ", video)
 
 	filename = os.path.splitext(os.path.basename(video))[0]
-	# if not os.path.exists(outpath + "/" + filename):
-	# 	os.makedirs(outpath + "/" + filename)
+	if not os.path.exists(outpath + "/" + filename):
+		os.makedirs(outpath + "/" + filename)
 
 	# init video capture with video
 	cap = cv2.VideoCapture(video)
@@ -141,17 +185,8 @@ def main(video, outpath, height, window_size):
 	width = math.floor(previous_frame.shape[1] * 
 			height / (previous_frame.shape[0]))
 
-	# load mask img
-	mask_img = cv2.imread("mask3.png", 0)
-	# make sure the size is correct. This should not be necessary
-	mask_img = cv2.resize(mask_img, (width, height))
-	mask_img_bgr = cv2.cvtColor(mask_img, cv2.COLOR_GRAY2BGR)
-
 	# resize frame
 	frame = cv2.resize(previous_frame, (width, height))
-	# frame[:,:,0] = mask_img * frame[:,:,0]
-	# frame[:,:,1] = mask_img * frame[:,:,1]
-	# frame[:,:,2] = mask_img * frame[:,:,2] 
 
 	# upload resized frame to GPU
 	gpu_frame = cv2.cuda_GpuMat()
@@ -178,6 +213,25 @@ def main(video, outpath, height, window_size):
 	cpu_flow_array = []
 
 
+	cv2.namedWindow('click to draw timelines')
+	cv2.setMouseCallback('click to draw timelines', draw_lines)
+
+	cv2.imshow("click to draw timelines", frame)
+
+	# wait for clicks until enter is hit
+	while(1):
+		k = cv2.waitKey()
+		if k == 13:
+			break
+
+
+	# initialize timelines
+	timelines = []
+	for i_vertex in range(0, len(line_pos) - 1, 2):
+		timeline = Timeline(line_pos[i_vertex], line_pos[i_vertex + 1], 10)
+		timelines.append(timeline)
+
+
 	frame_count = 0
 	while True:
 		# start full pipeline timer
@@ -193,16 +247,7 @@ def main(video, outpath, height, window_size):
 		if not ret:
 			break
 
-		# load mask img
-		mask_img = cv2.imread("mask3.png", 0)
-		# make sure the size is correct. This should not be necessary
-		mask_img = cv2.resize(mask_img, (width, height))
-
-
 		resized_frame = cv2.resize(frame, (width, height))
-		# resized_frame[:,:,0] = mask_img * resized_frame[:,:,0]
-		# resized_frame[:,:,1] = mask_img * resized_frame[:,:,1]
-		# resized_frame[:,:,2] = mask_img * resized_frame[:,:,2] 
 
 		# upload frame to GPU
 		gpu_frame.upload(frame)
@@ -210,6 +255,7 @@ def main(video, outpath, height, window_size):
 		# end reading timer, and record
 		end_read_time = time.time()
 		timers["reading"].append(end_read_time - start_read_time)
+
 
 		# start pre-process timer
 		start_pre_time = time.time()
@@ -248,6 +294,7 @@ def main(video, outpath, height, window_size):
 
 		
 		cpu_flow = gpu_flow.download()
+		cpu_flow = calc_unit_flow_cpu(cpu_flow)
 
 		# prevent bug on edge
 		cpu_flow = zero_edge_flow(cpu_flow)
@@ -270,85 +317,25 @@ def main(video, outpath, height, window_size):
 			cpu_flow_array.pop(0)
 
 
-		# major direction
-		flow_eigvals = cpu_flow_average.copy()
-		flow_eigvecs = cpu_flow_average.copy()
-
-
-		# i height
-		# j width
-		# flow[height][width][x][y]
-		# print(frame_count, num_frames-2)
-		if frame_count == num_frames - 2:
-			offset = 10
-			for i_height in range(offset, len(cpu_flow_average)-offset):
-				for i_width in range(offset, len(cpu_flow_average[0])-offset):
-
-					# find offset position
-					above = cpu_flow_average[i_height-offset][i_width]
-					below = cpu_flow_average[i_height+offset][i_width]
-					left = cpu_flow_average[i_height][i_width-offset]
-					right = cpu_flow_average[i_height][i_width+offset]
-
-					# find gradient tensor
-					# du/dx dv/dx
-					# du/dy dv/dy
-					grad_tensor = np.array([
-									[right[0] - left[0], right[1] - left[1]],
-									[below[0] - above[0], below[1] - above[1]]
-								  ])
-
-					# calculate the symmetric deform part
-					deform_tensor = np.array([
-										[(grad_tensor[0][0] + grad_tensor[0][0])/2, (grad_tensor[1][0] + grad_tensor[0][1])/2],
-										[(grad_tensor[0][1] + grad_tensor[1][0])/2, (grad_tensor[1][1] + grad_tensor[1][1])/2]
-									])
-
-					eigvals, eigvecs = la.eig(deform_tensor)
-
-					flow_eigvals[i_height][i_width][0] = abs(eigvals[0].real)
-					flow_eigvals[i_height][i_width][1] = 0
-					flow_eigvecs[i_height][i_width] = eigvecs[0]
-
-
-			np.save(outpath + "_eigavl.npy", flow_eigvals)
-
-			# mask out
-			flow_eigvals = np.stack(((mask_img > 0),)*2, axis=-1) * flow_eigvals
-			flow_eigvecs = np.stack(((mask_img > 0),)*2, axis=-1) * flow_eigvecs
-
-			flow_eig_bgr = cal_eigval_val_threshold(flow_eigvals, 0.16)
-			cv2.imwrite(outpath + "_flow_eigen_016.jpg", flow_eig_bgr)
-
-			flow_eig_bgr_overlay = flow_eig_bgr.copy()
-			cv2.addWeighted(flow_eig_bgr, 0.5, resized_frame, 1.0, 0, flow_eig_bgr_overlay)
-			cv2.imwrite(outpath + "_flow_eigen_016_overlay.jpg", flow_eig_bgr_overlay)
-
-
-			# screenshot
-			cv2.imwrite(outpath + "_frame.jpg", resized_frame)
-
-			# flow average (duplicate)
-			cpu_flow_average_angle, cpu_flow_average_magnitude = calc_angle_from_flow_cpu(cpu_flow_average)
-			cpu_flow_average_bgr = calc_bgr_from_angle_magnitude(cpu_flow_average_angle, cpu_flow_average_magnitude)
-			cv2.imwrite(outpath + "_flow_average.jpg", cpu_flow_average_bgr)
-
-			quit()
-
-			#flow_eigvecs[:,:,0] = (flow_eigvals[:,:,0] > flow_eigen_percentile_val) * flow_eigvecs[:,:,0]
-			#flow_eigvecs[:,:,1] = (flow_eigvals[:,:,0] > flow_eigen_percentile_val) * flow_eigvecs[:,:,1]
-
-
-		# Program ends here
-		#quit()
-
-
 		cpu_flow_average_angle, cpu_flow_average_magnitude = calc_angle_from_flow_cpu(cpu_flow_average)
-		flow_eigvecs_angle, flow_eigvecs_magnitude = calc_angle_from_flow_cpu(flow_eigvecs)
+
+		# create new timeline
+		if frame_count == 0:
+			for timeline in timelines:
+				timeline.birth_line()
+
+	
+		# move timelines
+		for timeline in timelines:
+			timeline.move_vertices(cpu_flow_average, 1)
+
 
 		cpu_flow_average_bgr = calc_bgr_from_angle_magnitude(cpu_flow_average_angle, cpu_flow_average_magnitude)
-		flow_eigvecs_bgr = calc_bgr_from_angle_magnitude(flow_eigvecs_angle, flow_eigvecs_magnitude)
 
+		# draw timelines
+		frame_timelines = resized_frame.copy()
+		for timeline in timelines:
+			frame_timelines = timeline.draw_lines(frame_timelines)
 
 
 		# update previous_frame value
@@ -364,28 +351,21 @@ def main(video, outpath, height, window_size):
 		timers["full pipeline"].append(end_full_time - start_full_time)
 
 		# visualization
-		#cv2.imshow("original", frame)
-		cv2.imshow("flow", cpu_flow_average_bgr)
-		cv2.imshow("flow eigen", flow_eigvecs_bgr)
-
+		cv2.imshow("timelines", frame_timelines)
 		k = cv2.waitKey(1)
 		if k == 27:
 			break
 
-		# if frame_count == 1200:
-		# 	break
+		if frame_count == 1500:
+			break
+
 
 		if k == 115:
-			#cv2.imwrite(outpath + "/contours_root.jpg", flow_contours_root)
-			# cv2.imwrite(outpath + "/flow_sub.jpg", cpu_flow_mean_sub_masked_bgr)
-			cv2.imwrite(outpath + "/" + filename + "/flow_average.jpg", cpu_flow_average_bgr)
-
+			cv2.imwrite(outpath + "/" + filename + "/flow_average_unit.jpg", cpu_flow_average_bgr)
 		frame_count += 1
 
-	# cv2.imwrite(outpath + "/" + filename + "/flow_average.jpg", cpu_flow_average_bgr)
-	# cv2.imwrite(outpath + "/" + filename + "/flow_eigen.jpg", flow_eigvecs_bgr)
-	cv2.imwrite(outpath + "_flow_average.jpg", cpu_flow_average_bgr)
-	cv2.imwrite(outpath + "_flow_eigen.jpg", flow_eigvecs_bgr)
+	cv2.imwrite(outpath + "/" + filename + "/flow_average_unit.jpg", cpu_flow_average_bgr)
+
 
 	# release the capture
 	cap.release()
