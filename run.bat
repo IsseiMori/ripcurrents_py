@@ -21,8 +21,13 @@ rem python shear.py --video E:\ripcurrents\Holland\mp4\selection\1016.mp4 --out 
 rem ::python shear.py --video E:\ripcurrents\Holland\mp4\selection\1020.mp4 --out E:/ripcurrents/Holland/mp4/shear_threshold/1020 --height 480 --window 1200
 
 
+rem for %%f in (E:/ripcurrents/flow_paper/original_data/*.mp4) do (
+rem 	python timex.py --video E:/ripcurrents/flow_paper/original_data/%%~nxf --out E:/ripcurrents/flow_paper/timex --height 480
+rem )
+
 for %%f in (E:/ripcurrents/flow_paper/original_data/*.mp4) do (
-	python timex.py --video E:/ripcurrents/flow_paper/original_data/%%~nxf --out E:/ripcurrents/flow_paper/timex --height 480
+	python timelines.py --video E:/ripcurrents/flow_paper/original_data/%%~nxf --out E:/ripcurrents/flow_paper/timelines --height 480
 )
 
-python timelines.py --video E:/ripcurrents/flow_paper/original_data/other_rip_02.mp4 --out E:/ripcurrents/flow_paper --height 480
+
+python perspective_color.py --video E:/ripcurrents/flow_paper/original_data/other_rip_08_stable.mp4 --out E:/ripcurrents/flow_paper/perspective --height 480

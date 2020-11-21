@@ -168,7 +168,12 @@ def main(video, outpath, height, window_size):
 		start_read_time = time.time()
 
 		# capture frame-by-frame
-		ret, frame = cap.read()
+		if frame_count % 15 == 0:
+			ret, frame = cap.read()
+		else:
+			_, _ = cap.read()
+			frame_count += 1
+			continue
 
 		# if frame reading was not successful, break
 		if not ret:
@@ -302,9 +307,9 @@ def main(video, outpath, height, window_size):
 
 		frame_count += 1
 
-	cv2.imwrite(outpath + "/" + filename + "/flow_average.jpg", cpu_flow_average_bgr)
-	cv2.imwrite(outpath + "/" + filename + "/flow_average_strong.jpg", cpu_flow_average_bgr_strong)
-	cv2.imwrite(outpath + "/" + filename + "/flow_average_overlay.jpg", cpu_flow_overlay)
+	cv2.imwrite(outpath + "/" + filename + "_flow_average.jpg", cpu_flow_average_bgr)
+	cv2.imwrite(outpath + "/" + filename + "_flow_average_strong.jpg", cpu_flow_average_bgr_strong)
+	cv2.imwrite(outpath + "/" + filename + "_flow_average_overlay.jpg", cpu_flow_overlay)
 
 
 	# release the capture
