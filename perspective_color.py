@@ -147,6 +147,7 @@ def main(video, outpath, height, window_size):
 	
 	print("reading ", video)
 
+
 	filename = os.path.splitext(os.path.basename(video))[0]
 	# if not os.path.exists(outpath + "/" + filename):
 	# 	os.makedirs(outpath + "/" + filename)
@@ -169,6 +170,8 @@ def main(video, outpath, height, window_size):
 	# width after resize
 	width = math.floor(frame.shape[1] * 
 			height / (frame.shape[0]))
+
+	video_out = cv2.VideoWriter(outpath + "/" + filename + "_flow_overlay.avi", cv2.VideoWriter_fourcc(*'MJPG'), fps, (width, height)) 
 
 	# load mask img
 	mask_img = cv2.imread("mask3.png", 0)
@@ -353,6 +356,8 @@ def main(video, outpath, height, window_size):
 		cv2.imshow("flow sub", cpu_flow_average_bgr_strong)
 		cv2.imshow("flow overlay", cpu_flow_overlay)
 
+		video_out.write(cpu_flow_overlay)
+
 		k = cv2.waitKey(1)
 		if k == 27:
 			break
@@ -372,6 +377,8 @@ def main(video, outpath, height, window_size):
 	cv2.imwrite(outpath + "/" + filename + "_flow_average_strong.jpg", cpu_flow_average_bgr_strong)
 	cv2.imwrite(outpath + "/" + filename + "_flow_average_overlay.jpg", cpu_flow_overlay)
 
+
+	video_out.release()
 
 	# release the capture
 	cap.release()

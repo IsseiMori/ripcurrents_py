@@ -189,6 +189,8 @@ def main(video, outpath, height, window_size):
 	width = math.floor(previous_frame.shape[1] * 
 			height / (previous_frame.shape[0]))
 
+	video_out = cv2.VideoWriter(outpath + "/" + filename + "_flow_overlay.avi", cv2.VideoWriter_fourcc(*'MJPG'), fps, (width, height)) 
+
 	# resize frame
 	frame = cv2.resize(previous_frame, (width, height))
 
@@ -362,6 +364,10 @@ def main(video, outpath, height, window_size):
 
 		# visualization
 		cv2.imshow("timelines", frame_timelines)
+
+		video_out.write(frame_timelines)
+
+
 		k = cv2.waitKey(1)
 		if k == 27:
 			break
@@ -380,6 +386,8 @@ def main(video, outpath, height, window_size):
 
 	# release the capture
 	cap.release()
+
+	video_out.release()
 
 	# destroy all windows
 	cv2.destroyAllWindows()
