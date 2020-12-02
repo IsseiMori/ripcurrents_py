@@ -30,4 +30,4 @@ for %%f in (E:/ripcurrents/flow_paper/original_data/*.mp4) do (
 )
 
 
-python perspective_color.py --video E:/ripcurrents/miami_short/miami_01_short.mp4 --out E:/ripcurrents/flow_paper --height 480
+python timelines.py --video E:/ripcurrents/miami_short/miami_01_short.mp4 --out E:/ripcurrents/flow_paper --height 480

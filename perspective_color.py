@@ -182,6 +182,37 @@ def main(video, outpath, height, window_size):
 	# resize frame
 	resized_frame = cv2.resize(frame, (width, height))
 
+
+
+
+	'''
+	perspective correction
+	'''
+	# TL, TR, BR, BL
+	cv2.namedWindow('click to draw a box')
+	cv2.setMouseCallback('click to draw a box', draw_lines)
+
+	cv2.imshow("click to draw a box", frame)
+
+	# wait for clicks until enter is hit
+	while(1):
+		k = cv2.waitKey()
+		if k == 13:
+			break
+
+
+	pts = np.array([(box_pos[0][0], box_pos[0][1]), (box_pos[1][0], box_pos[1][1]), (box_pos[2][0], box_pos[2][1]), (box_pos[3][0], box_pos[3][1])])
+	# apply the four point tranform to obtain a "birds eye view" of
+	# the image
+	resized_frame = four_point_transform(frame, width, height, pts)
+
+
+
+
+
+
+
+
 	# upload resized frame to GPU
 	gpu_frame = cv2.cuda_GpuMat()
 	gpu_frame.upload(resized_frame)
@@ -209,23 +240,6 @@ def main(video, outpath, height, window_size):
 	color_wheel = cv2.imread("colorWheel.jpg")
 
 
-	# TL, TR, BR, BL
-	cv2.namedWindow('click to draw a box')
-	cv2.setMouseCallback('click to draw a box', draw_lines)
-
-	cv2.imshow("click to draw a box", frame)
-
-	# wait for clicks until enter is hit
-	while(1):
-		k = cv2.waitKey()
-		if k == 13:
-			break
-
-
-	pts = np.array([(box_pos[0][0], box_pos[0][1]), (box_pos[1][0], box_pos[1][1]), (box_pos[2][0], box_pos[2][1]), (box_pos[3][0], box_pos[3][1])])
-	# apply the four point tranform to obtain a "birds eye view" of
-	# the image
-	resized_frame = four_point_transform(frame, width, height, pts)
 
 	frame_count = 0
 	while True:
