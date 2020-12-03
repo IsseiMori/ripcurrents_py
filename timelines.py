@@ -82,6 +82,23 @@ def zero_edge_flow(cpu_flow):
 
 	return cpu_flow
 
+def remove_outlier(cpu_flow):
+	
+	q3_x = np.quantile(cpu_flow[:,:,0], (0.75))
+	q3_y = np.quantile(cpu_flow[:,:,1], (0.75))
+	q1_x = np.quantile(cpu_flow[:,:,0], (0.25))
+	q1_y = np.quantile(cpu_flow[:,:,1], (0.25))
+
+	ior_x = q3_x - q1_x
+	ior_y = q3_y - q1_y
+
+	cpu_flow[:,:,0] = np.where(cpu_flow[:,:,0] > (q3_x + 1.5 * ior_x), 0, cpu_flow[:,:,0])
+	cpu_flow[:,:,1] = np.where(cpu_flow[:,:,1] > (q3_y + 1.5 * ior_y), 0, cpu_flow[:,:,1])
+	cpu_flow[:,:,0] = np.where(cpu_flow[:,:,0] > (q3_y + 1.5 * ior_y), 0, cpu_flow[:,:,0])
+	cpu_flow[:,:,1] = np.where(cpu_flow[:,:,1] > (q3_x + 1.5 * ior_x), 0, cpu_flow[:,:,1])
+
+	return cpu_flow
+
 line_pos = []
 def draw_lines(event, x, y, flags, param):
 	if event == cv2.EVENT_LBUTTONDOWN:
@@ -302,11 +319,12 @@ def main(video, outpath, height, window_size):
 
 		
 		cpu_flow = gpu_flow.download()
-		#cpu_flow = calc_unit_flow_cpu(cpu_flow)
+		cpu_flow = calc_unit_flow_cpu(cpu_flow)
 
 		# prevent bug on edge
 		#cpu_flow = zero_edge_flow(cpu_flow)
 
+		cpu_flow = remove_outlier(cpu_flow)
 
 
 		'''
@@ -364,6 +382,7 @@ def main(video, outpath, height, window_size):
 
 		# visualization
 		cv2.imshow("timelines", frame_timelines)
+		cv2.imshow("flow", cpu_flow_average_bgr)
 
 		video_out.write(frame_timelines)
 
