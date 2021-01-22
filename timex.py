@@ -18,8 +18,8 @@ def main(video, outpath, height):
 	print("reading ", video)
 
 	filename = os.path.splitext(os.path.basename(video))[0]
-	if not os.path.exists(outpath + "/" + filename):
-		os.makedirs(outpath + "/" + filename)
+	# if not os.path.exists(outpath + "/" + filename):
+	# 	os.makedirs(outpath + "/" + filename)
 
 	# init video capture with video
 	cap = cv2.VideoCapture(video)
@@ -99,8 +99,8 @@ def main(video, outpath, height):
 
 		frame_count += 1
 
-	print(outpath + "/" + filename + "/timex.jpg")
-	cv2.imwrite(outpath + "/" + filename + "/timex.jpg", avg)
+	#print(outpath + "/" + filename + "/timex.jpg")
+	cv2.imwrite(outpath + "/" + filename + "_timex.jpg", avg)
 
 	# release the capture
 	cap.release()

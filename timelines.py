@@ -241,13 +241,16 @@ def main(video, outpath, height, window_size):
 	cv2.namedWindow('click to draw timelines')
 	cv2.setMouseCallback('click to draw timelines', draw_lines)
 
-	cv2.imshow("click to draw timelines", frame)
+	# cv2.imshow("click to draw timelines", frame)
 
-	# wait for clicks until enter is hit
-	while(1):
-		k = cv2.waitKey()
-		if k == 13:
-			break
+	# # wait for clicks until enter is hit
+	# while(1):
+	# 	k = cv2.waitKey()
+	# 	if k == 13:
+	# 		break
+
+	line_pos.append(np.array([56, 320]))
+	line_pos.append(np.array([315, 313]))
 
 
 	# initialize timelines
@@ -327,20 +330,22 @@ def main(video, outpath, height, window_size):
 		cpu_flow = remove_outlier(cpu_flow)
 
 
-		'''
-		create aggregated flow 
-		'''
-		cpu_flow_divided = cpu_flow / window_size
-		cpu_flow_array.append(cpu_flow_divided)
+		# '''
+		# create aggregated flow 
+		# '''
+		# cpu_flow_divided = cpu_flow / window_size
+		# cpu_flow_array.append(cpu_flow_divided)
 
-		if frame_count == 0:
-			cpu_flow_average = cpu_flow_divided.copy()
-		elif  frame_count < window_size:
-			cpu_flow_average += cpu_flow_divided
-		else:
-			cpu_flow_average += cpu_flow_divided
-			cpu_flow_average -= cpu_flow_array[0]
-			cpu_flow_array.pop(0)
+		# if frame_count == 0:
+		# 	cpu_flow_average = cpu_flow_divided.copy()
+		# elif  frame_count < window_size:
+		# 	cpu_flow_average += cpu_flow_divided
+		# else:
+		# 	cpu_flow_average += cpu_flow_divided
+		# 	cpu_flow_average -= cpu_flow_array[0]
+		# 	cpu_flow_array.pop(0)
+
+		cpu_flow_average = cpu_flow.copy()
 
 
 		cpu_flow_average_angle, cpu_flow_average_magnitude = calc_angle_from_flow_cpu(cpu_flow_average)
@@ -353,10 +358,11 @@ def main(video, outpath, height, window_size):
 	
 		# move timelines
 		for timeline in timelines:
-			timeline.move_vertices(cpu_flow_average, 3)
+			timeline.move_vertices(cpu_flow_average, 1)
 
 
 		cpu_flow_average_bgr = calc_bgr_from_angle_magnitude(cpu_flow_average_angle, cpu_flow_average_magnitude)
+		cpu_flow_average_bgr_strong = calc_bgr_from_angle_magnitude(cpu_flow_average_angle, np.ones_like(cpu_flow_average_angle, np.float32))
 
 
 		add_color_wheel(cpu_flow_average_bgr, color_wheel)
@@ -382,7 +388,7 @@ def main(video, outpath, height, window_size):
 
 		# visualization
 		cv2.imshow("timelines", frame_timelines)
-		cv2.imshow("flow", cpu_flow_average_bgr)
+		cv2.imshow("flow", cpu_flow_average_bgr_strong)
 
 		video_out.write(frame_timelines)
 

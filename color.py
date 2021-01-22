@@ -68,7 +68,7 @@ def calc_unit_flow_cpu(cpu_flow):
 def zero_edge_flow(cpu_flow):
 
 	height, width, _ = cpu_flow.shape
-	offset = 50
+	offset = 20
 
 	cpu_flow[0:offset,:,0] = 0
 	cpu_flow[0:offset,:,1] = 0
@@ -80,6 +80,27 @@ def zero_edge_flow(cpu_flow):
 	cpu_flow[:,width-offset:width,1] = 0
 
 	return cpu_flow
+
+def remove_outlier(cpu_flow):
+	
+	q3_x = np.quantile(cpu_flow[:,:,0], (0.75))
+	q3_y = np.quantile(cpu_flow[:,:,1], (0.75))
+	q1_x = np.quantile(cpu_flow[:,:,0], (0.25))
+	q1_y = np.quantile(cpu_flow[:,:,1], (0.25))
+
+	ior_x = q3_x - q1_x
+	ior_y = q3_y - q1_y
+
+	cpu_flow[:,:,0] = np.where(cpu_flow[:,:,0] > (q3_x + 1.5 * ior_x), 0, cpu_flow[:,:,0])
+	cpu_flow[:,:,1] = np.where(cpu_flow[:,:,1] > (q3_y + 1.5 * ior_y), 0, cpu_flow[:,:,1])
+	cpu_flow[:,:,0] = np.where(cpu_flow[:,:,0] > (q3_y + 1.5 * ior_y), 0, cpu_flow[:,:,0])
+	cpu_flow[:,:,1] = np.where(cpu_flow[:,:,1] > (q3_x + 1.5 * ior_x), 0, cpu_flow[:,:,1])
+
+	return cpu_flow
+
+def add_color_wheel(img, wheel):
+	wheel_resized = cv2.resize(wheel, (50, 50))
+	img[10:10+wheel_resized.shape[0], 10:10+wheel_resized.shape[1]] = wheel_resized
 
 
 def main(video, outpath, height, window_size):
@@ -96,8 +117,8 @@ def main(video, outpath, height, window_size):
 	print("reading ", video)
 
 	filename = os.path.splitext(os.path.basename(video))[0]
-	if not os.path.exists(outpath + "/" + filename):
-		os.makedirs(outpath + "/" + filename)
+	# if not os.path.exists(outpath + "/" + filename):
+	# 	os.makedirs(outpath + "/" + filename)
 
 	# init video capture with video
 	cap = cv2.VideoCapture(video)
@@ -117,6 +138,12 @@ def main(video, outpath, height, window_size):
 	# width after resize
 	width = math.floor(previous_frame.shape[1] * 
 			height / (previous_frame.shape[0]))
+
+
+	video_out = cv2.VideoWriter(outpath + "/" + filename + "_flow_overlay.avi", cv2.VideoWriter_fourcc(*'MJPG'), fps, (width, height)) 
+	video_out2 = cv2.VideoWriter(outpath + "/" + filename + "_flow_color.avi", cv2.VideoWriter_fourcc(*'MJPG'), fps, (width, height)) 
+	video_out3 = cv2.VideoWriter(outpath + "/" + filename + "_flow_strong.avi", cv2.VideoWriter_fourcc(*'MJPG'), fps, (width, height)) 
+
 
 	# load mask img
 	mask_img = cv2.imread("mask3.png", 0)
@@ -157,6 +184,8 @@ def main(video, outpath, height, window_size):
 	cpu_flow_max = None
 	cpu_flow_mag_max = None
 
+	color_wheel = cv2.imread("colorWheel.jpg")
+
 
 
 	frame_count = 0
@@ -168,12 +197,14 @@ def main(video, outpath, height, window_size):
 		start_read_time = time.time()
 
 		# capture frame-by-frame
-		if frame_count % 15 == 0:
-			ret, frame = cap.read()
-		else:
-			_, _ = cap.read()
-			frame_count += 1
-			continue
+		# if frame_count % 15 == 0:
+		# 	ret, frame = cap.read()
+		# else:
+		# 	_, _ = cap.read()
+		# 	frame_count += 1
+		# 	continue
+
+		ret, frame = cap.read()
 
 		# if frame reading was not successful, break
 		if not ret:
@@ -232,6 +263,8 @@ def main(video, outpath, height, window_size):
 
 		# prevent bug on edge
 		cpu_flow = zero_edge_flow(cpu_flow)
+		#cpu_flow = calc_unit_flow_cpu(cpu_flow)
+		cpu_flow = remove_outlier(cpu_flow)
 
 
 
@@ -274,6 +307,17 @@ def main(video, outpath, height, window_size):
 		cpu_flow_overlay = cpu_flow_average_bgr.copy()
 		cv2.addWeighted(cpu_flow_average_bgr, 1, resized_frame, 1, 0, cpu_flow_overlay)
 
+		add_color_wheel(cpu_flow_average_bgr, color_wheel)
+		add_color_wheel(cpu_flow_average_bgr_strong, color_wheel)
+		add_color_wheel(cpu_flow_overlay, color_wheel)
+
+		cpu_flow_average_bgr = cv2.putText(cpu_flow_average_bgr, str(frame_count), (30,30), cv2.FONT_HERSHEY_SIMPLEX,  
+                   0.8, (255,255,255), 1, cv2.LINE_AA) 
+		cpu_flow_average_bgr_strong = cv2.putText(cpu_flow_average_bgr_strong, str(frame_count), (30,30), cv2.FONT_HERSHEY_SIMPLEX,  
+                   0.8, (255,255,255), 1, cv2.LINE_AA) 
+		cpu_flow_overlay = cv2.putText(cpu_flow_overlay, str(frame_count), (30,30), cv2.FONT_HERSHEY_SIMPLEX,  
+                   0.8, (255,255,255), 1, cv2.LINE_AA) 
+
 		# update previous_frame value
 		gpu_previous = gpu_current
 	
@@ -292,12 +336,18 @@ def main(video, outpath, height, window_size):
 		cv2.imshow("flow sub", cpu_flow_average_bgr_strong)
 		cv2.imshow("flow overlay", cpu_flow_overlay)
 
+		video_out.write(cpu_flow_overlay)
+		video_out2.write(cpu_flow_average_bgr)
+		video_out3.write(cpu_flow_average_bgr_strong)
+
 		k = cv2.waitKey(1)
 		if k == 27:
 			break
 
-		if frame_count == 1500:
-			break
+		# if frame_count % 450 == 0 and frame_count != 0:
+		# 	cv2.imwrite(outpath + "/" + filename + "_unit_flow_average" + str(frame_count) + ".jpg", cpu_flow_average_bgr)
+		# 	cv2.imwrite(outpath + "/" + filename + "_unit_flow_average_strong" + str(frame_count) + ".jpg", cpu_flow_average_bgr_strong)
+		# 	cv2.imwrite(outpath + "/" + filename + "_unit_flow_average_overlay" + str(frame_count) + ".jpg", cpu_flow_overlay)
 
 
 		if k == 115:
@@ -307,13 +357,17 @@ def main(video, outpath, height, window_size):
 
 		frame_count += 1
 
-	cv2.imwrite(outpath + "/" + filename + "_flow_average.jpg", cpu_flow_average_bgr)
-	cv2.imwrite(outpath + "/" + filename + "_flow_average_strong.jpg", cpu_flow_average_bgr_strong)
-	cv2.imwrite(outpath + "/" + filename + "_flow_average_overlay.jpg", cpu_flow_overlay)
+	# cv2.imwrite(outpath + "/" + filename + "_unit_flow_average.jpg", cpu_flow_average_bgr)
+	# cv2.imwrite(outpath + "/" + filename + "_unit_flow_average_strong.jpg", cpu_flow_average_bgr_strong)
+	# cv2.imwrite(outpath + "/" + filename + "_unit_flow_average_overlay.jpg", cpu_flow_overlay)
 
 
 	# release the capture
 	cap.release()
+
+	video_out.release()
+	video_out2.release()
+	video_out3.release()
 
 	# destroy all windows
 	cv2.destroyAllWindows()
