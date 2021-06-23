@@ -52,10 +52,36 @@ def main(video, outpath, height, window_size, grid_size, bin_size, wave_dir):
 	width = math.floor(frame.shape[1] * 
 			height / (frame.shape[0]))
 
-	video_out1 = cv2.VideoWriter(outpath + "/" + filename + "_" + str(bin_size) + "_vis_flow.avi", cv2.VideoWriter_fourcc(*'MJPG'), fps, (width, height)) 
+	video_out1 = cv2.VideoWriter(outpath + "/" + filename + "_" + str(bin_size) + "_arrows.avi", cv2.VideoWriter_fourcc(*'MJPG'), fps, (width, height)) 
+	video_out2 = cv2.VideoWriter(outpath + "/" + filename + "_" + str(bin_size) + "_color.avi", cv2.VideoWriter_fourcc(*'MJPG'), fps, (width, height)) 
+	video_out3 = cv2.VideoWriter(outpath + "/" + filename + "_" + str(bin_size) + "_color_strong.avi", cv2.VideoWriter_fourcc(*'MJPG'), fps, (width, height)) 
+
 
 	# resize frame
 	resized_frame = cv2.resize(frame, (width, height))
+
+	gpu_frame = cv2.cuda_GpuMat()
+	gpu_frame.upload(resized_frame)
+
+	previous_frame = cv2.cvtColor(resized_frame, cv2.COLOR_BGR2GRAY)
+
+	gpu_previous = cv2.cuda_GpuMat()
+	gpu_previous.upload(previous_frame)
+
+	# create gpu_hsv output for optical flow
+	gpu_hsv = cv2.cuda_GpuMat(gpu_frame.size(), cv2.CV_32FC3)
+	gpu_hsv_8u = cv2.cuda_GpuMat(gpu_frame.size(), cv2.CV_8UC3)
+
+	gpu_h = cv2.cuda_GpuMat(gpu_frame.size(), cv2.CV_32FC1)
+	gpu_s = cv2.cuda_GpuMat(gpu_frame.size(), cv2.CV_32FC1)
+	gpu_v = cv2.cuda_GpuMat(gpu_frame.size(), cv2.CV_32FC1)
+
+	# set saturation to 1
+	gpu_s.upload(np.ones_like(previous_frame, np.float32))
+
+	cpu_flow_array = []
+
+	color_wheel = cv2.imread("colorWheel.jpg")
 
 
 	# Calculate number of arrows
@@ -118,7 +144,41 @@ def main(video, outpath, height, window_size, grid_size, bin_size, wave_dir):
 
 		resized_frame = cv2.resize(frame, (width, height))
 
+
 		gray_frame = cv2.cvtColor(resized_frame, cv2.COLOR_BGR2GRAY)
+
+		gpu_frame.upload(resized_frame)
+		#gpu_frame = cv2.cuda.resize(gpu_frame, (width, height))
+		gpu_current = cv2.cuda.cvtColor(gpu_frame, cv2.COLOR_BGR2GRAY)
+		gpu_flow = cv2.cuda_FarnebackOpticalFlow.create(
+			4, 0.5, False, 5, 10, 7, 1.5, 0,
+		)
+		# calculate optical flow
+		gpu_flow = cv2.cuda_FarnebackOpticalFlow.calc(
+			gpu_flow, gpu_previous, gpu_current, None,
+		)
+		cpu_flow = gpu_flow.download()
+		'''
+		create aggregated flow 
+		'''
+		cpu_flow_divided = cpu_flow / window_size
+		cpu_flow_array.append(cpu_flow_divided)
+
+		if frame_count == 0:
+			cpu_flow_average = cpu_flow_divided.copy()
+		elif  frame_count < window_size:
+			cpu_flow_average += cpu_flow_divided
+		else:
+			cpu_flow_average += cpu_flow_divided
+			cpu_flow_average -= cpu_flow_array[0]
+			cpu_flow_array.pop(0)
+
+
+		cpu_flow_average_angle, cpu_flow_average_magnitude = my_flow.calc_angle_from_flow_cpu(cpu_flow_average)
+	
+		gpu_previous = gpu_current
+
+
 
 		# start optical flow timer
 		start_of = time.time()
@@ -140,8 +200,6 @@ def main(video, outpath, height, window_size, grid_size, bin_size, wave_dir):
 			flow[row][col][1] = new_points[i][1] - vertices_root[i][1]
 
 		# Calculate unit flow
-		flow_unit = my_flow.flow_to_unit(flow)
-
 		flow_bins = my_flow.flow_to_bins(flow, bin_num)
 
 		current_buffer_i = frame_count % window_size
@@ -153,31 +211,29 @@ def main(video, outpath, height, window_size, grid_size, bin_size, wave_dir):
 		buffer_flow[current_buffer_i] = flow
 		sum_flow += flow
 
-		# update total unit flow
-		sum_unit_flow -= buffer_unit_flow[current_buffer_i]
-		buffer_unit_flow[current_buffer_i] = flow
-		sum_unit_flow += flow_unit
-
-
-		# update bin hist
-		if frame_count >= window_size:
-			bin_hist = my_flow.remove_from_bin_hist(bin_hist, buffer_bin[current_buffer_i])
-		buffer_bin[current_buffer_i] = flow_bins
-		bin_hist = my_flow.append_to_bin_hist(bin_hist, flow_bins)
-		max_bins = my_flow.hist_to_max_bin(bin_hist)
-
-		# update bin weighted hist
-		bin_weighted = my_flow.flow_to_bin_weighted(flow, bin_num)
-		sum_bin_weighted_hist -= buffer_bin_weighted_hist[current_buffer_i]
-		buffer_bin_weighted_hist[current_buffer_i] = bin_weighted
-		sum_bin_weighted_hist += bin_weighted
-		max_bins_weighted = my_flow.hist_to_max_bin(sum_bin_weighted_hist)
 
 		# start optical flow timer
 		start_of = time.time()
 
-		threshold_min_mag = min(window_size, frame_count+1) * 0
-		vis_flow, _ = my_flow.draw_arrows_flow(resized_frame, sum_flow, bin_num, vertices_root_pos_2d, grid_size * 0.8, wave_dir, threshold_min_mag)
+		threshold_min_mag = min(window_size, frame_count+1) * 0.5
+		vis_flow, rip_bins = my_flow.draw_arrows_flow(resized_frame, sum_flow, bin_num, vertices_root_pos_2d, grid_size * 0.8, wave_dir, threshold_min_mag)
+
+		
+		cpu_flow_average_bgr = my_flow.calc_bgr_from_angle_magnitude_rip(cpu_flow_average_angle, cpu_flow_average_magnitude, rip_bins)
+		cpu_flow_average_bgr_strong = my_flow.calc_bgr_from_angle_magnitude_rip(cpu_flow_average_angle, np.ones_like(cpu_flow_average_angle, np.float32), rip_bins)
+
+		cpu_flow_overlay = cpu_flow_average_bgr.copy()
+		cv2.addWeighted(cpu_flow_average_bgr, 1, resized_frame, 1, 0, cpu_flow_overlay)
+		my_flow.add_color_wheel(cpu_flow_overlay, color_wheel)
+		cpu_flow_overlay = cv2.putText(cpu_flow_overlay, str(frame_count), (30,30), cv2.FONT_HERSHEY_SIMPLEX,  
+                   0.8, (255,255,255), 1, cv2.LINE_AA)
+
+		cpu_flow_overlay2 = cpu_flow_average_bgr_strong.copy()
+		cv2.addWeighted(cpu_flow_average_bgr_strong, 0.5, resized_frame, 1, 0, cpu_flow_overlay2)
+		my_flow.add_color_wheel(cpu_flow_overlay, color_wheel)
+		cpu_flow_overlay2 = cv2.putText(cpu_flow_overlay2, str(frame_count), (30,30), cv2.FONT_HERSHEY_SIMPLEX,  
+                   0.8, (255,255,255), 1, cv2.LINE_AA)
+
 
 		# end of timer, and record
 		end_of = time.time()
@@ -195,8 +251,12 @@ def main(video, outpath, height, window_size, grid_size, bin_size, wave_dir):
 
 		# visualization
 		cv2.imshow("vis_flow", vis_flow)
+		cv2.imshow("flow", cpu_flow_overlay)
+		cv2.imshow("flow2", cpu_flow_overlay2)
 
 		video_out1.write(vis_flow)
+		video_out2.write(cpu_flow_overlay)
+		video_out3.write(cpu_flow_overlay2)
 
 		k = cv2.waitKey(1)
 		if k == 27:
@@ -205,6 +265,8 @@ def main(video, outpath, height, window_size, grid_size, bin_size, wave_dir):
 		frame_count += 1
 
 	video_out1.release()
+	video_out2.release()
+	video_out3.release()
 
 	# cv2.imwrite(outpath + "/" + filename + "_timelines.jpg", frame_timelines)
 	# cv2.imwrite(outpath + "/" + filename + "_timelines_norm.jpg", frame_timelines_norm)

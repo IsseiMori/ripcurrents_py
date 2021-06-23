@@ -64,6 +64,9 @@ def main(video, outpath, height, window_size, grid_size, bin_size, wave_dir):
 
 	print(arrow_count_h, arrow_count_w)
 
+	mask_img = cv2.imread("E:/ripcurrents/flow_paper/figures/rip1/masks.png", 0)
+	#mask_img = cv2.resize(mask_img, (width, height))
+
 	# 1D array of vertices position
 	vertices_root =  np.array([], dtype=np.float32)
 	vertices_root_pos_2d = np.zeros((arrow_count_h, arrow_count_w, 2), dtype=np.float32)
@@ -71,6 +74,7 @@ def main(video, outpath, height, window_size, grid_size, bin_size, wave_dir):
 		for col in range (0, arrow_count_w):
 			x0 = col*grid_size + grid_size/2
 			y0 = row*grid_size + grid_size/2
+
 			if row == 0 and col == 0: 
 				vertices_root =  np.array([x0, y0], dtype=np.float32)
 			else:
@@ -177,7 +181,7 @@ def main(video, outpath, height, window_size, grid_size, bin_size, wave_dir):
 		start_of = time.time()
 
 		threshold_min_mag = min(window_size, frame_count+1) * 0
-		vis_flow, _ = my_flow.draw_arrows_flow(resized_frame, sum_flow, bin_num, vertices_root_pos_2d, grid_size * 0.8, wave_dir, threshold_min_mag)
+		vis_flow, _ = my_flow.draw_arrows_flow_mask(resized_frame, sum_flow, bin_num, vertices_root_pos_2d, grid_size * 0.8, wave_dir, mask_img, grid_size, threshold_min_mag)
 
 		# end of timer, and record
 		end_of = time.time()

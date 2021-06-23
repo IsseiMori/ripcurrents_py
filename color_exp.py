@@ -26,18 +26,10 @@ def calc_angle_from_flow_cpu(cpu_flow):
 	return cpu_flow_angle, cpu_flow_magnitude
 
 def calc_bgr_from_angle_magnitude(cpu_flow_angle, cpu_flow_magnitude):
-
-	new_magnitude = cpu_flow_magnitude.copy()
-	new_magnitude = np.clip(new_magnitude, 0, np.quantile(new_magnitude, (0.95)))
-	new_magnitude = new_magnitude / np.max(new_magnitude)
-	new_magnitude = new_magnitude
-	
-
-
 	cpu_flow_hsv = cv2.merge((
 		cpu_flow_angle, 
 		np.ones_like(cpu_flow_angle, np.float32),
-		new_magnitude
+		cpu_flow_magnitude
 	))
 
 	cpu_flow_bgr = cv2.cvtColor(cpu_flow_hsv, cv2.COLOR_HSV2BGR) * 255
@@ -111,7 +103,7 @@ def add_color_wheel(img, wheel):
 	img[10:10+wheel_resized.shape[0], 10:10+wheel_resized.shape[1]] = wheel_resized
 
 
-def main(video, outpath, height, window_size):
+def main(video, outpath, height, window_size, ripsize):
 
 	# init dict to track time for every stage at each iteration
 	timers = {
@@ -143,16 +135,24 @@ def main(video, outpath, height, window_size):
 	# proceed if frame reading was successful
 	if not ret: return
 
-	print("read success")
-
 	# width after resize
 	width = math.floor(previous_frame.shape[1] * 
 			height / (previous_frame.shape[0]))
 
+	do_resize = True
+	if (height == 0):
+		width = previous_frame.shape[1]
+		hright = previous_frame.shape[0]
 
-	video_out = cv2.VideoWriter(outpath + "/" + filename + "_flow_overlay.avi", cv2.VideoWriter_fourcc(*'MJPG'), fps, (width, height)) 
-	video_out2 = cv2.VideoWriter(outpath + "/" + filename + "_flow_color.avi", cv2.VideoWriter_fourcc(*'MJPG'), fps, (width, height)) 
-	video_out3 = cv2.VideoWriter(outpath + "/" + filename + "_flow_strong.avi", cv2.VideoWriter_fourcc(*'MJPG'), fps, (width, height)) 
+
+	#video_out = cv2.VideoWriter(outpath + "/" + filename + "/" + str(height) + "/" + str(ripsize) + "/" + "_overlay.avi", cv2.VideoWriter_fourcc(*'MJPG'), fps, (width, height)) 
+	#video_out2 = cv2.VideoWriter(outpath + "/" + filename + "/" + str(height) + "/" + str(ripsize) + "/" + "_color.avi", cv2.VideoWriter_fourcc(*'MJPG'), fps, (width, height)) 
+	video_out3 = cv2.VideoWriter(outpath + "/" + filename + "_" + str(height) + "_" + str(ripsize) + ".avi", cv2.VideoWriter_fourcc(*'MJPG'), fps, (width, height)) 
+
+
+	# video_out = cv2.VideoWriter(outpath + "/" + filename + "_flow_overlay.avi", cv2.VideoWriter_fourcc(*'MJPG'), fps, (width, height)) 
+	# video_out2 = cv2.VideoWriter(outpath + "/" + filename + "_flow_color.avi", cv2.VideoWriter_fourcc(*'MJPG'), fps, (width, height)) 
+	# video_out3 = cv2.VideoWriter(outpath + "/" + filename + "_flow_strong.avi", cv2.VideoWriter_fourcc(*'MJPG'), fps, (width, height)) 
 
 
 	# load mask img
@@ -253,7 +253,7 @@ def main(video, outpath, height, window_size):
 		# create optical flow instance
 		# create (int numLevels=5, double pyrScale=0.5, bool fastPyramids=false, int winSize=13, int numIters=10, int polyN=5, double polySigma=1.1, int flags=0)
 		gpu_flow = cv2.cuda_FarnebackOpticalFlow.create(
-			4, 0.5, False, 2, 10, 7, 1.5, 0,
+			4, 0.5, False, ripsize, 10, 7, 1.5, 0,
 		)
 		# calculate optical flow
 		gpu_flow = cv2.cuda_FarnebackOpticalFlow.calc(
@@ -272,9 +272,9 @@ def main(video, outpath, height, window_size):
 		cpu_flow = gpu_flow.download()
 
 		# prevent bug on edge
-		# cpu_flow = zero_edge_flow(cpu_flow)
+		#cpu_flow = zero_edge_flow(cpu_flow)
 		#cpu_flow = calc_unit_flow_cpu(cpu_flow)
-		# cpu_flow = remove_outlier(cpu_flow)
+		cpu_flow = remove_outlier(cpu_flow)
 
 
 
@@ -315,18 +315,18 @@ def main(video, outpath, height, window_size):
 
 
 		cpu_flow_overlay = cpu_flow_average_bgr.copy()
-		cv2.addWeighted(cpu_flow_average_bgr, 0.5, resized_frame, 1, 0, cpu_flow_overlay)
+		cv2.addWeighted(cpu_flow_average_bgr, 1, resized_frame, 1, 0, cpu_flow_overlay)
 
-		add_color_wheel(cpu_flow_average_bgr, color_wheel)
-		add_color_wheel(cpu_flow_average_bgr_strong, color_wheel)
-		add_color_wheel(cpu_flow_overlay, color_wheel)
+		#add_color_wheel(cpu_flow_average_bgr, color_wheel)
+		#add_color_wheel(cpu_flow_average_bgr_strong, color_wheel)
+		#add_color_wheel(cpu_flow_overlay, color_wheel)
 
-		cpu_flow_average_bgr = cv2.putText(cpu_flow_average_bgr, str(frame_count), (30,30), cv2.FONT_HERSHEY_SIMPLEX,  
-                   0.8, (255,255,255), 1, cv2.LINE_AA) 
-		cpu_flow_average_bgr_strong = cv2.putText(cpu_flow_average_bgr_strong, str(frame_count), (30,30), cv2.FONT_HERSHEY_SIMPLEX,  
-                   0.8, (255,255,255), 1, cv2.LINE_AA) 
-		cpu_flow_overlay = cv2.putText(cpu_flow_overlay, str(frame_count), (30,30), cv2.FONT_HERSHEY_SIMPLEX,  
-                   0.8, (255,255,255), 1, cv2.LINE_AA) 
+		cpu_flow_average_bgr = cv2.putText(cpu_flow_average_bgr, str(frame_count), (int(height/15.0),int(height/15.0)), cv2.FONT_HERSHEY_SIMPLEX,  
+                   height/500.0, (255,255,255), 1, cv2.LINE_AA) 
+		cpu_flow_average_bgr_strong = cv2.putText(cpu_flow_average_bgr_strong, str(frame_count), (int(height/15.0),int(height/15.0)), cv2.FONT_HERSHEY_SIMPLEX,  
+                   height/500.0, (255,255,255), 1, cv2.LINE_AA) 
+		cpu_flow_overlay = cv2.putText(cpu_flow_overlay, str(frame_count), (int(height/15.0),int(height/15.0)), cv2.FONT_HERSHEY_SIMPLEX,  
+                   height/500.0, (255,255,255), 1, cv2.LINE_AA) 
 
 		# update previous_frame value
 		gpu_previous = gpu_current
@@ -342,12 +342,12 @@ def main(video, outpath, height, window_size):
 
 		# visualization
 		#cv2.imshow("original", frame)
-		cv2.imshow("flow", cpu_flow_average_bgr)
+		#cv2.imshow("flow", cpu_flow_average_bgr)
 		cv2.imshow("flow sub", cpu_flow_average_bgr_strong)
-		cv2.imshow("flow overlay", cpu_flow_overlay)
+		#cv2.imshow("flow overlay", cpu_flow_overlay)
 
-		video_out.write(cpu_flow_overlay)
-		video_out2.write(cpu_flow_average_bgr)
+		#video_out.write(cpu_flow_overlay)
+		#video_out2.write(cpu_flow_average_bgr)
 		video_out3.write(cpu_flow_average_bgr_strong)
 
 		k = cv2.waitKey(1)
@@ -375,8 +375,8 @@ def main(video, outpath, height, window_size):
 	# release the capture
 	cap.release()
 
-	video_out.release()
-	video_out2.release()
+	#video_out.release()
+	#video_out2.release()
 	video_out3.release()
 
 	# destroy all windows
@@ -421,13 +421,18 @@ if __name__ == "__main__":
 		"--window", help="resized height of the output", required=False, type=int, default=900,
 	)
 
+	parser.add_argument(
+		"--ripsize", help="window size for optical flow parameter", required=False, type=int, default=7,
+	)
+
 	# parsing script arguments
 	args = parser.parse_args()
 	video = args.video
 	outpath = args.out
 	height = args.height
 	window_size = args.window
+	ripsize = args.ripsize
 
 
 	# run pipeline
-	main(video, outpath, height, window_size)
+	main(video, outpath, height, window_size, ripsize)
